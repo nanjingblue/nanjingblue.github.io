@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="item left" data-color="radial-gradient(#999,#cc6c0e"><img src="鸣人.png" width="100%" alt=""></div>
+        <div class="item middle" data-color="radial-gradient(#999,#293242"><img src="佐助.png" width="100%" alt=""></div>
+        <div class="item right" data-color="radial-gradient(#999,#bc4641"><img src="小樱.png" width="100%" alt=""></div>
+    </div>
+    <script>
+        const items = document.querySelectorAll('.item');
+        for(let i=0;i<items.length;i++){
+            items[i].addEventListener('click',function(){
+                this.classList.remove('left','middle','right');
+                this.classList.add('middle');
+                document.body.style.background=this.dataset.color;
+                let left=this.previousElementSibling ?? items[items.length-1];
+                left.classList.remove('left','middle','right');
+                left.classList.add('left');
+                let right = this.nextElementSibling ?? items[0];
+                right.classList.remove('left','middle','right');
+                right.classList.add('right');
+            })
+        }
+    </script>
+</body>
+</html>
