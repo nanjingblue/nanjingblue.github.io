@@ -1,170 +1,105 @@
-<!doctype html>
-<html>
-
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>Particles</title>
-    <link rel="stylesheet" href="css/example.css">
-    <style type="text/css">
-        html,
-        body {
-            background: #222;
-        }
-    </style>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>njnu.icu</title>
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+		}
+		body {
+			background-color: #de335e;
+		}
+		#logo {
+			text-align: center;
+			margin-top: 35px;
+			margin-bottom: 20px;
+		}
+		#text {
+			margin: auto auto;
+			margin-bottom: 50px;
+			width: 600px;
+			text-align: left;
+			color: #eee;
+		}
+		h1 {
+			font-size: 35px;
+			margin-bottom: 0;
+		}
+		#text .line {
+			height: 2px;
+			width: 600px;
+			margin: 20px auto;
+			border-bottom: #eb859e solid 2px;
+		}
+		.tag {
+			width: 600px;
+			padding-left: 16px;
+			border-left: solid 4px #eee;
+		}
+	</style>
 </head>
-
 <body>
-    <div id="container"></div>
-    <!-- <header class="info">
-            <hgroup class="about">
-                <h1>sketch.js &rsaquo; particles</h1>
-                <h2>Create a multi-touch particle toy with sketch.js</h2>
-                <h3>Start drawing!</h3>
-            </hgroup>
-            <nav class="more">
-                <a href="https://github.com/soulwire/sketch.js/archive/master.zip" target="_blank">Download</a>
-                <a href="https://github.com/soulwire/sketch.js" target="_blank">View on Github</a>
-            </nav>
-        </header> -->
-    <script src="./js/sketch.js"></script>
-    <script>
-        // ----------------------------------------
-        // Particle
-        // ----------------------------------------
+	<div id="logo">
+		<a href="http://www.njnu.edu.cn/"><img src="./nnulogo.jpg" alt=""></a>
+	</div>
+	<div id="text">
+		<h1>南京师范大学</h1>
+		<p style="margin-top: 0;font-size: 16px;">Nanjing Normal University</p>
+		<div class="line"></div>
+		<h2>一、简介</h2><br>
+		<p>南京师范大学（Nanjing Normal University），简称“南京师大”、“南师”，坐落于六朝古都南京市，是中华人民共和国教育部与江苏省人民政府共建的重点大学，国家首批世界一流学科建设高校，“211工程”重点建设高校，江苏高水平大学建设高校；入选国家“111计划”、卓越教师培养计划、卓越法律人才教育培养计划、国家建设高水平大学公派研究生项目、中国政府奖学金来华留学生接收院校、国家大学生文化素质教育基地、教育部来华留学示范基地，是中国高等师范教育的发祥地之一。</p><br>
+		<p>学校主源可追溯到1902年创办的三江师范学堂，后历经两江师范学堂、南京高等师范学校、国立东南大学、国立第四中山大学、江苏大学、国立中央大学、国立南京大学等时期；另一源头为1888年创办的汇文书院，后发展为私立金陵大学，1951年与私立金陵女子文理学院（原金陵女子大学）合并，成立公立金陵大学。1952年全国高校院系调整，以南京大学、金陵大学等有关院系为基础，在原金陵女子大学校址组建南京师范学院。1984年更名为南京师范大学。2000年南京动力高等专科学校并入。</p><br>
+		<p>截至2020年9月，学校拥有仙林、随园、紫金、镇江四个校区，占地面积3179633平方米，校舍总建筑面积1432076.19平方米，随园校区有着“东方最美丽的校园”之美誉；设有二级学院28个、独立学院2个；在职教职工3250人，专任教师2803人；在校普通本科生37900人，在校硕博研究生11728人；6个学科在第四轮学科评估中进入A类，8个学科跻身ESI全球前1%。</p>
+		<div class="line"></div>
+		<h2>二、南京师范大学2020年度事业发展十件大事</h2><br><br>
 
-        function Particle(x, y, radius) {
-            this.init(x, y, radius);
-        }
+		<h3>1. 深入学习贯彻落实党的十九届四中全会、五中全会精神和习近平总书记关于教育的重要论述，推进学校治理体系和治理能力建设</h3><br>
 
-        Particle.prototype = {
+		<div class="tag">
+			学校在全省首次地方高校综合考核中获第一等次、学校纪委在省纪委工作考核中获第一等次
+		</div>
 
-            init: function (x, y, radius) {
+		<div class="line"></div>
+		<h3>2. 积极开展新冠疫情防控</h3><br>
+		<div class="tag">
+			较早实现大规模返校复学，获评全国“抗击新冠肺炎疫情青年志愿服务先进集体”“2020年全国抗疫最美家庭”“江苏省高校后勤系统新冠肺炎疫情防控工作先进集体”；多名教师获疫情防控先进个人表彰
+		</div>
+		<div class="line"></div>
 
-                this.alive = true;
+		<h3>3. 科研立项迈上新台阶</h3><br>
+		<div class="tag">获批国家社科基金重大项目、教育部哲社重大课题攻关项目5项；获批国家社科基金项目38项，创历史新高；获批国家自科基金项目106项，其中重大、重点项目4项。</div>
+		<div class="line"></div>
 
-                this.radius = radius || 10;
-                this.wander = 0.15;
-                this.theta = random(TWO_PI);
-                this.drag = 0.92;
-                this.color = '#fff';
+		<h3>4. 本科教学取得新成效</h3><br>
+		<div class="tag">入选国家级一流本科课程12门；获全国高校青年教师教学竞赛思政课专项组一等奖1项</div>
+		<div class="line"></div>
 
-                this.x = x || 0.0;
-                this.y = y || 0.0;
+		<h3>5. 学生在各类评比、竞赛中获得优异成绩</h3><br>
+		<div class="tag">。获“全国优秀共青团员”2名，全国大学生智能互联创新大赛、GIS应用技能大赛、物理学术竞赛、海洋知识竞赛、高校商业精英挑战赛、中国研究生能源装备创新设计大赛、数学建模竞赛等特等奖、一等奖多项。</div>
+		<div class="line"></div>
 
-                this.vx = 0.0;
-                this.vy = 0.0;
-            },
+		<h3>6. 多人入选高端人才计划</h3><br>
+		<div class="tag">入选国家重大人才计划哲学社会科学领军人才、青年拔尖人才、百千万工程国家级人选和国家级有突出贡献中青年专家4人次，“玛丽·居里学者”人才计划1人，国务院学位委员会第八届学科评议组成员5人</div>
+		<div class="line"></div>
 
-            move: function () {
+		<h3>7. 产生多项高水平科研成果</h3><br>
+		<div class="tag">数学学科跻身ESI全球前1%；获教育部高校人文社科优秀成果奖21项，其中一等奖5项，并首次获得普及读物奖和青年奖；在PNAS上发表第一通讯作者单位论文3篇；获中国地理信息产业协会地理信息科技进步奖一等奖1项</div>
+		<div class="line"></div>
 
-                this.x += this.vx;
-                this.y += this.vy;
+		<h3>8. 创新发展取得新突破</h3><br>
+		<div class="tag">启动全国首批复合型硕士层次高中教师培养试点改革项目，以“物理学+技术教育”“历史学+思想政治教育”为试点专业；成立计算机与电子信息学院/人工智能学院</div>
+		<div class="line"></div>
 
-                this.vx *= this.drag;
-                this.vy *= this.drag;
+		<h3>9. 社会服务开创新局面</h3><br>
+		<div class="tag">学校大学科技园建成省级大学科技园；先后与江西上饶、广东东莞黄江镇、无锡滨湖区和扬州邗江区等签订了联合办学协议，新签合作项目数和金额创历史新高</div>
+		<div class="line"></div>
 
-                this.theta += random(-0.5, 0.5) * this.wander;
-                this.vx += sin(this.theta) * 0.1;
-                this.vy += cos(this.theta) * 0.1;
-
-                this.radius *= 0.96;
-                this.alive = this.radius > 0.5;
-            },
-
-            draw: function (ctx) {
-
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius, 0, TWO_PI);
-                ctx.fillStyle = this.color;
-                ctx.fill();
-            }
-        };
-
-        // ----------------------------------------
-        // Example
-        // ----------------------------------------
-
-        var MAX_PARTICLES = 280;
-        var COLOURS = ['#69D2E7', '#A7DBD8', '#E0E4CC', '#F38630', '#FA6900', '#FF4E50', '#F9D423'];
-
-        var particles = [];
-        var pool = [];
-
-        var demo = Sketch.create({
-            container: document.getElementById('container'),
-            retina: 'auto'
-        });
-
-        demo.setup = function () {
-
-            // Set off some initial particles.
-            var i, x, y;
-
-            for (i = 0; i < 20; i++) {
-                x = (demo.width * 0.5) + random(-100, 100);
-                y = (demo.height * 0.5) + random(-100, 100);
-                demo.spawn(x, y);
-            }
-        };
-
-        demo.spawn = function (x, y) {
-
-            var particle, theta, force;
-
-            if (particles.length >= MAX_PARTICLES)
-                pool.push(particles.shift());
-
-            particle = pool.length ? pool.pop() : new Particle();
-            particle.init(x, y, random(5, 40));
-
-            particle.wander = random(0.5, 2.0);
-            particle.color = random(COLOURS);
-            particle.drag = random(0.9, 0.99);
-
-            theta = random(TWO_PI);
-            force = random(2, 8);
-
-            particle.vx = sin(theta) * force;
-            particle.vy = cos(theta) * force;
-
-            particles.push(particle);
-        };
-
-        demo.update = function () {
-
-            var i, particle;
-
-            for (i = particles.length - 1; i >= 0; i--) {
-
-                particle = particles[i];
-
-                if (particle.alive) particle.move();
-                else pool.push(particles.splice(i, 1)[0]);
-            }
-        };
-
-        demo.draw = function () {
-
-            demo.globalCompositeOperation = 'lighter';
-
-            for (var i = particles.length - 1; i >= 0; i--) {
-                particles[i].draw(demo);
-            }
-        };
-
-        demo.mousemove = function () {
-
-            var particle, theta, force, touch, max, i, j, n;
-
-            for (i = 0, n = demo.touches.length; i < n; i++) {
-
-                touch = demo.touches[i], max = random(1, 4);
-                for (j = 0; j < max; j++) {
-                    demo.spawn(touch.x, touch.y);
-                }
-
-            }
-        };
-    </script>
+		<h3>10. 国际交流实现新进步</h3><br>
+		<div class="tag">获科技部2020年度国家外国专家项目3项、江苏高校外国留学生英文授课省级精品课程9门；获评中教国际教育交流中心项目最佳合作单位、江苏省来华留学生教育先进集体</div>
+		<div class="line"></div>
+	</div>
 </body>
-
 </html>
