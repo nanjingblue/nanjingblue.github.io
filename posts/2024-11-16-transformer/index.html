@@ -18,7 +18,7 @@
     
     
     <link rel="stylesheet" href="/css/style.min.7fc129d30960564fa498744c744864287a7f816f65396f5442fa981eb3dea09f.css">
-    <link rel="stylesheet" href="/assets/css/extended.min.9729f28a5087b689b946e103d96abd63bfd37b1417effa251dbf798312e3fba5.css">
+    <link rel="stylesheet" href="/assets/css/extended.min.c1b64e34229add00c2ba8bd1cd04a270167449f2cf2649b58fddf439665f299e.css">
 
   
     <meta name="description" content="Simple implementation of Transformer using pytorch"/>
@@ -63,6 +63,8 @@
     });
 </script>
 
+
+.katex-display { overflow: auto hidden }
 </head>
 
 
@@ -454,7 +456,7 @@ $$</p>
 <p>多头注意力能够决定缩放点积注意力的输入大小. 作为一个子层, 其中的Residual Connection和Layer Norm是必须的.</p>
 <p>多头注意力是多个不同的头来获取不同的特征, 类似于多个<strong>卷积核</strong>所达到的效果. 在计算完后通过一个Linear调整大小:</p>
 <p>$$
-MultiHead(Q,K,V)=Concat(head_1, head_2, \dots,head_h)W^o \ where \quad head_i = Attention(QW_i^Q, kW_i^K, VW_i^V)
+MultiHead(Q,K,V)=Concat(head_1, head_2, \dots,head_h)W^o \newline where \quad head_i = Attention(QW_i^Q, kW_i^K, VW_i^V)
 $$</p>
 <p>多头注意力在Encoder和Decoder中的使用略有区别, 主要区别在于Mask的不同. 我们前面已经实现了两种Mask函数, 在这里会用到.</p>
 <p>多头注意力实际上不是通过弄出很多大小相同的矩阵然后相乘来实现的, 只需要合并到一个矩阵进行计算:</p>
