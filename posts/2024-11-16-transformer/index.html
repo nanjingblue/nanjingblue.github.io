@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <title>Torch实现Transformer - Milo&#39;s bog</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="https://nanjingblue.github.io/favicon.png">
+  <link rel="canonical" href="https://nanjingblue.github.io/posts/2024-11-16-transformer/" />
+
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Long+Cang&family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+  
+   
+<link rel="stylesheet" href="/js/katex/katex.min.css" >
+<script src="/js/katex/katex.min.js" > </script>
+<script src="/js/katex/contrib/auto-render.min.js" ></script>
+ 
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+      renderMathInElement(document.body);
+    });
+</script>
+    
+    
+    <link rel="stylesheet" href="/css/style.min.7fc129d30960564fa498744c744864287a7f816f65396f5442fa981eb3dea09f.css">
+    <link rel="stylesheet" href="/assets/css/extended.min.9729f28a5087b689b946e103d96abd63bfd37b1417effa251dbf798312e3fba5.css">
+
+  
+    <meta name="description" content="Simple implementation of Transformer using pytorch"/>
+    <meta property="og:title" content="Torch实现Transformer"/>
+    <meta property="og:type" content="website"/>
+    <meta property="og:url" content="https://nanjingblue.github.io/posts/2024-11-16-transformer/"/>
+    <meta property="og:image" content="https://img.miloz.icu/imgs/202411161443254.jpg"/>
+    <meta property="og:description" content="Simple implementation of Transformer using pytorch"/>
+    <meta name="twitter:card" content="summary"/>
+    <meta name="twitter:site" content="@zerostaticio"/>
+    <meta name="twitter:creator" content="@zerostaticio"/>
+  
+
+  
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&amp;display=swap" rel="stylesheet">
+  
+
+  
+</head>
+
+
+
+
+<body class='page frame page-blog-single'>
+  <div id="menu-main-mobile" class="menu-main-mobile">
+    <ul class="menu">
+        
+        
+            
+                <li class="menu-item-home">
+                    <a href="https://nanjingblue.github.io/">Home</a>
+                </li>
+            
+        
+            
+                <li class="menu-item-blog">
+                    <a href="https://nanjingblue.github.io/posts/">Blog</a>
+                </li>
+            
+        
+            
+                <li class="menu-item-about">
+                    <a href="https://nanjingblue.github.io/pages/about/">About</a>
+                </li>
+            
+        
+            
+                <li class="menu-item-tags">
+                    <a href="https://nanjingblue.github.io/tags/">Tags</a>
+                </li>
+            
+        
+    </ul>
+</div>
+  <div id="wrapper" class="wrapper">
+    <div class='header'>
+  <a class="header-logo" href="/">Milo&#39;s bog</a>
+  <div class="menu-main">
+    <ul>
+      
+      
+      
+      
+      <li class="menu-item-home ">
+        <a href="/">
+          
+          <span>Home</span>
+        </a>
+      </li>
+      
+      
+      
+      <li class="menu-item-blog ">
+        <a href="/posts/">
+          
+          <span>Blog</span>
+        </a>
+      </li>
+      
+      
+      
+      <li class="menu-item-about ">
+        <a href="/pages/about/">
+          
+          <span>About</span>
+        </a>
+      </li>
+      
+      
+      
+      <li class="menu-item-tags ">
+        <a href="/tags/">
+          
+          <span>Tags</span>
+        </a>
+      </li>
+      
+    </ul>
+  </div>
+  <div id="toggle-menu-main-mobile" class="hamburger-trigger">
+    <button class="hamburger">Menu</button>
+  </div>
+</div>
+    
+  <div class="blog">
+    
+    <div class="intro">
+      <h1>Torch实现Transformer<span class="dot">.</span></h1>
+      
+      <img alt="Transformer" src="https://img.miloz.icu/imgs/202411161443254.jpg" />
+      
+    </div>
+    <div class="content">
+      <h1 id="transformer-torch实现">Transformer torch实现</h1>
+<h1 id="preparing">Preparing</h1>
+<p>导包</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="kn">import</span> <span class="nn">torch</span>
+</span></span><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">nn</span>
+</span></span><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">optim</span>
+</span></span><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">torch.utils</span> <span class="kn">import</span> <span class="n">data</span> <span class="k">as</span> <span class="n">Data</span>
+</span></span><span class="line"><span class="cl"><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+</span></span></code></pre></div><p>超参数设置</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="n">d_model</span> <span class="o">=</span> <span class="mi">512</span>  <span class="c1"># embedding size</span>
+</span></span><span class="line"><span class="cl"><span class="n">max_len</span> <span class="o">=</span> <span class="mi">1024</span>  <span class="c1"># max length of sequence</span>
+</span></span><span class="line"><span class="cl"><span class="n">d_ff</span> <span class="o">=</span> <span class="mi">2048</span>  <span class="c1"># feed forward neural network dimension</span>
+</span></span><span class="line"><span class="cl"><span class="n">d_k</span> <span class="o">=</span> <span class="n">d_v</span> <span class="o">=</span> <span class="mi">64</span>  <span class="c1"># dimension of k (same as q) and v</span>
+</span></span><span class="line"><span class="cl"><span class="n">n_layers</span> <span class="o">=</span> <span class="mi">6</span>  <span class="c1"># number of encoder ans decoder layers</span>
+</span></span><span class="line"><span class="cl"><span class="n">n_heads</span> <span class="o">=</span> <span class="mi">8</span>  <span class="c1"># number of heads in multi head attention</span>
+</span></span><span class="line"><span class="cl"><span class="n">p_drop</span> <span class="o">=</span> <span class="mf">0.1</span>  <span class="c1"># probability of dropout</span>
+</span></span></code></pre></div><ul>
+<li>d_model: Embedding的大小.</li>
+<li>max_len: 输入序列的最长大小.</li>
+<li>d_ff: 前馈神经网络的隐藏层大小, 一般是d_model的四倍.</li>
+<li>d_k, d_v: 自注意力中K和V的维度, Q的维度直接用K的维度代替, 因为这二者必须始终相等.</li>
+<li>n_layers: Encoder和Decoder的层数.</li>
+<li>n_heads: 自注意力多头的头数.</li>
+<li>p_drop: Dropout的概率.</li>
+</ul>
+<h1 id="mask">MASK</h1>
+<p>MASK有两种，一种是因为在数据中使用了padding, 不希望pad被加入到注意力中进行计算的Pad Mask for Attention, 还有一种是保证Decoder自回归信息不泄露的Subsequent Mask for Decoder.</p>
+<p>在Encoder和Decoder中使用Mask的情况可能各有不同:</p>
+<ul>
+<li>在Encoder中使用Mask, 是为了将<code>encoder_input</code>中没有内容而打上PAD的部分进行Mask, 方便矩阵运算.</li>
+<li>在Decoder中使用Mask, 可能是在Decoder的自注意力对<code>decoder_input</code> 的PAD进行Mask, 也有可能是对Encoder - Decoder自注意力时对<code>encoder_input</code>和<code>decoder_input</code>的PAD进行Mask</li>
+</ul>
+<h2 id="pad-mask-for-attention"><strong>Pad Mask for Attention</strong></h2>
+<p>输入序列的长度各不相同，通过<code>&lt;PAD&gt;</code>填充固定长度，但需要避免对填充<code>&lt;PAD&gt;</code>字符的位置计算注意力权重，故通过mask矩阵将填充字符的位置设置为<code>True</code>，假设<code>&lt;PAD&gt;</code>在字典中的Index是0, 遇到输入为0直接将其标为True.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="k">def</span> <span class="nf">get_attn_pad_mask</span><span class="p">(</span><span class="n">seq_q</span><span class="p">,</span> <span class="n">seq_k</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">    <span class="s2">&#34;&#34;&#34;
+</span></span></span><span class="line"><span class="cl"><span class="s2">    Padding, because of unequal in source_len and target_len.
+</span></span></span><span class="line"><span class="cl"><span class="s2">    parameters:
+</span></span></span><span class="line"><span class="cl"><span class="s2">    seq_q: [batch, seq_len]
+</span></span></span><span class="line"><span class="cl"><span class="s2">    seq_k: [batch, seq_len]
+</span></span></span><span class="line"><span class="cl"><span class="s2">    return:
+</span></span></span><span class="line"><span class="cl"><span class="s2">    mask: [batch, len_q, len_k]
+</span></span></span><span class="line"><span class="cl"><span class="s2">    &#34;&#34;&#34;</span>
+</span></span><span class="line"><span class="cl">    <span class="n">batch</span><span class="p">,</span> <span class="n">len_q</span> <span class="o">=</span> <span class="n">seq_q</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">    <span class="n">batch</span><span class="p">,</span> <span class="n">len_k</span> <span class="o">=</span> <span class="n">seq_k</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1"># define index of PAD is 0, if tensor equals (zero) PAD tokens</span>
+</span></span><span class="line"><span class="cl">    <span class="n">pad_attn_mask</span> <span class="o">=</span> <span class="n">seq_k</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">eq</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>   <span class="c1"># (batch, 1, len_k)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="n">pad_attn_mask</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="n">len_q</span><span class="p">,</span> <span class="n">len_k</span><span class="p">)</span>    <span class="c1"># (batch, len_q, len_k)</span>
+</span></span></code></pre></div><h2 id="subsequent-mask-for-decoder"><strong>Subsequent Mask for Decoder</strong></h2>
+<p>生成自回归（autoregressive）掩码矩阵，主要用于解码器的注意力机制中，防止模型在预测某个位置的词时，访问未来位置的词。</p>
+<p>通过掩盖目标序列中的未来词语位置，确保解码器只能看到当前和之前的词，而不能看到将来未预测的词。这在训练自回归模型时尤为重要，使用一个上三角矩阵即可：</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="k">def</span> <span class="nf">get_attn_subsequent_mask</span><span class="p">(</span><span class="n">seq</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">    <span class="s2">&#34;&#34;&#34;
+</span></span></span><span class="line"><span class="cl"><span class="s2">    Build attention mask matrix for decoder when it auto regressing.
+</span></span></span><span class="line"><span class="cl"><span class="s2">    :param seq: [batch, target_len]
+</span></span></span><span class="line"><span class="cl"><span class="s2">    :return:
+</span></span></span><span class="line"><span class="cl"><span class="s2">    subsequent_mask: [batch, target_len, target_len]
+</span></span></span><span class="line"><span class="cl"><span class="s2">    &#34;&#34;&#34;</span>
+</span></span><span class="line"><span class="cl">    <span class="n">attn_shape</span> <span class="o">=</span> <span class="p">[</span><span class="n">seq</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">seq</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">seq</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">1</span><span class="p">)]</span>  <span class="c1"># [batch, target_len, target_len]</span>
+</span></span><span class="line"><span class="cl">    <span class="n">subsequent_mask</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">triu</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">attn_shape</span><span class="p">),</span> <span class="n">k</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># [batch, target_len, target_len]</span>
+</span></span><span class="line"><span class="cl">    <span class="n">subsequent_mask</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">subsequent_mask</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="n">subsequent_mask</span>  <span class="c1"># [batch, target_len, target_len]</span>
+</span></span></code></pre></div><h2 id="单元测试">单元测试</h2>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="kn">import</span> <span class="nn">unittest</span>
+</span></span><span class="line"><span class="cl"><span class="kn">import</span> <span class="nn">torch</span>
+</span></span><span class="line"><span class="cl"><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">TestAttentionMasks</span><span class="p">(</span><span class="n">unittest</span><span class="o">.</span><span class="n">TestCase</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="nf">test_get_attn_pad_mask</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="kn">from</span> <span class="nn">utils</span> <span class="kn">import</span> <span class="n">get_attn_pad_mask</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># 测试数据</span>
+</span></span><span class="line"><span class="cl">        <span class="n">batch_size</span> <span class="o">=</span> <span class="mi">2</span>
+</span></span><span class="line"><span class="cl">        <span class="n">seq_len</span> <span class="o">=</span> <span class="mi">5</span>
+</span></span><span class="line"><span class="cl">        <span class="n">seq_q</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]])</span>
+</span></span><span class="line"><span class="cl">        <span class="n">seq_k</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]])</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># 调用函数</span>
+</span></span><span class="line"><span class="cl">        <span class="n">pad_mask</span> <span class="o">=</span> <span class="n">get_attn_pad_mask</span><span class="p">(</span><span class="n">seq_q</span><span class="p">,</span> <span class="n">seq_k</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># 检查输出形状</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">pad_mask</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">seq_len</span><span class="p">,</span> <span class="n">seq_len</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># 检查mask矩阵内容</span>
+</span></span><span class="line"><span class="cl">        <span class="n">expected_mask</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">True</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">True</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">True</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">True</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">True</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">        <span class="p">],</span> <span class="p">[</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">        <span class="p">]],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bool</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">equal</span><span class="p">(</span><span class="n">pad_mask</span><span class="p">,</span> <span class="n">expected_mask</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="nf">test_get_attn_subsequent_mask</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="kn">from</span> <span class="nn">utils</span> <span class="kn">import</span> <span class="n">get_attn_subsequent_mask</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># 测试数据</span>
+</span></span><span class="line"><span class="cl">        <span class="n">batch_size</span> <span class="o">=</span> <span class="mi">2</span>
+</span></span><span class="line"><span class="cl">        <span class="n">target_len</span> <span class="o">=</span> <span class="mi">5</span>
+</span></span><span class="line"><span class="cl">        <span class="n">seq</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">target_len</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># 调用函数</span>
+</span></span><span class="line"><span class="cl">        <span class="n">subsequent_mask</span> <span class="o">=</span> <span class="n">get_attn_subsequent_mask</span><span class="p">(</span><span class="n">seq</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># 检查输出形状</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">subsequent_mask</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">target_len</span><span class="p">,</span> <span class="n">target_len</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># 检查mask矩阵内容</span>
+</span></span><span class="line"><span class="cl">        <span class="n">expected_mask</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">        <span class="p">],</span> <span class="p">[</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">        <span class="p">]],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># 确保subsequent_mask的值与期望值一致</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">equal</span><span class="p">(</span><span class="n">subsequent_mask</span><span class="o">.</span><span class="n">float</span><span class="p">(),</span> <span class="n">expected_mask</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">    <span class="n">unittest</span><span class="o">.</span><span class="n">main</span><span class="p">()</span>
+</span></span></code></pre></div><h1 id="positional-encoding"><strong>Positional Encoding</strong></h1>
+<h2 id="绝对位置编码">绝对位置编码</h2>
+<p>在Transformer中, 使用的是绝对位置编码, 用于传输给模型Self - Attention所不能传输的位置信息, 使模型在处理序列数据时能够感知到词汇的位置信息。该位置编码基于正弦和余弦函数构建，并且在不同维度上采用不同的频率来表示各个位置。</p>
+<p>$$
+PE(pos, 2i) = \sin(pos/10000^{\frac{2i}{d_{model}}}) \ PE(pos,2i+1) =\cos(pos/10000^{\frac{2i}{d_{model}}})
+$$</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">PositionalEncoding</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">d_model</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">dropout</span><span class="o">=</span><span class="mf">.1</span><span class="p">,</span> <span class="n">max_len</span><span class="o">=</span><span class="mi">1024</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="nb">super</span><span class="p">(</span><span class="n">PositionalEncoding</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">dropout</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Dropout</span><span class="p">(</span><span class="n">p</span><span class="o">=</span><span class="n">dropout</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">positional_encoding</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">max_len</span><span class="p">,</span> <span class="n">d_model</span><span class="p">)</span> <span class="c1"># [max_len, d_model]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">position</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">max_len</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>    <span class="c1"># [max_len, 1]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">div_term</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">d_model</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span> <span class="o">*</span>
+</span></span><span class="line"><span class="cl">                             <span class="p">(</span><span class="o">-</span><span class="n">torch</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">([</span><span class="mi">10000</span><span class="p">]))</span> <span class="o">/</span> <span class="n">d_model</span><span class="p">))</span>     <span class="c1"># [max_len / 2]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">positional_encoding</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">::</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">position</span> <span class="o">*</span> <span class="n">div_term</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="n">positional_encoding</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">::</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">position</span> <span class="o">*</span> <span class="n">div_term</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">positional_encoding</span> <span class="o">=</span> <span class="n">positional_encoding</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># [max_len, d_model] -&gt; [1, max_len, d_model] -&gt; [max_len, 1, d_model]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">register_buffer</span><span class="p">(</span><span class="s1">&#39;pe&#39;</span><span class="p">,</span> <span class="n">positional_encoding</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="s2">&#34;&#34;&#34;
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :param x: (seq_len, batch, d_model)
+</span></span></span><span class="line"><span class="cl"><span class="s2">        &#34;&#34;&#34;</span>
+</span></span><span class="line"><span class="cl">        <span class="n">x</span> <span class="o">=</span> <span class="n">x</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">pe</span><span class="p">[:</span><span class="n">x</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="o">...</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dropout</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</span></span></code></pre></div><p>在实现代码中，计算频率尺度因子 <code>div_term</code> 的公式：</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="n">div_term</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">d_model</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span> <span class="o">*</span> <span class="p">(</span><span class="o">-</span><span class="n">torch</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">10000.0</span><span class="p">))</span> <span class="o">/</span> <span class="n">d_model</span><span class="p">))</span>
+</span></span></code></pre></div><p>这个div_term实际上等价于公式中的$10000^{-\frac{2i}{d_{model}}}$，这是通过将指数对数运算转换来实现的：</p>
+<p>$$
+10000^{-\frac{2i}{d_{model}}} = exp(-\frac{2i}{d_{model}}\cdot\ln(10000))
+$$</p>
+<p>使用 <code>torch.arange(0, d_model, 2)</code> 生成偶数索引，通过乘以 <code>-torch.log(torch.tensor(10000.0))/d_model</code> 缩放，得到期望的缩放因子。</p>
+<p>代码中这种实现方式的目的是将指数缩放逻辑直接通过 <code>torch.exp</code> 运算符实现，以提高数值稳定性和兼容性。这种方式与论文公式等价，但实现上使用了 <code>torch.exp</code> 而不是直接求 $10000^{-\frac{2i}{d_{model}}}$，从而避免了在实现中频繁调用幂运算，确保计算精度并优化效率。</p>
+<h3 id="单元测试-1">单元测试</h3>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">TestPositionalEncoding</span><span class="p">(</span><span class="n">unittest</span><span class="o">.</span><span class="n">TestCase</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="nf">test_positional_encoding_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># 定义参数</span>
+</span></span><span class="line"><span class="cl">        <span class="n">d_model</span> <span class="o">=</span> <span class="mi">512</span>
+</span></span><span class="line"><span class="cl">        <span class="n">max_len</span> <span class="o">=</span> <span class="mi">1024</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># 初始化PositionalEncoding</span>
+</span></span><span class="line"><span class="cl">        <span class="n">pe</span> <span class="o">=</span> <span class="n">PositionalEncoding</span><span class="p">(</span><span class="n">d_model</span><span class="o">=</span><span class="n">d_model</span><span class="p">,</span> <span class="n">max_len</span><span class="o">=</span><span class="n">max_len</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># 检查pe buffer的形状</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">pe</span><span class="o">.</span><span class="n">pe</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="p">(</span><span class="n">max_len</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">d_model</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="nf">test_positional_encoding_values</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">d_model</span> <span class="o">=</span> <span class="mi">6</span>
+</span></span><span class="line"><span class="cl">        <span class="n">max_len</span> <span class="o">=</span> <span class="mi">10</span>
+</span></span><span class="line"><span class="cl">        <span class="n">pe</span> <span class="o">=</span> <span class="n">PositionalEncoding</span><span class="p">(</span><span class="n">d_model</span><span class="o">=</span><span class="n">d_model</span><span class="p">,</span> <span class="n">max_len</span><span class="o">=</span><span class="n">max_len</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># 检查正弦和余弦交替填充</span>
+</span></span><span class="line"><span class="cl">        <span class="n">position</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">max_len</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># [max_len, 1]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">div_term</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">d_model</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span> <span class="o">*</span> <span class="p">(</span><span class="o">-</span><span class="n">torch</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">10000.0</span><span class="p">))</span> <span class="o">/</span> <span class="n">d_model</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">        <span class="n">expected_pe</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">max_len</span><span class="p">,</span> <span class="n">d_model</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="n">expected_pe</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">::</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">position</span> <span class="o">*</span> <span class="n">div_term</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="n">expected_pe</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">::</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">position</span> <span class="o">*</span> <span class="n">div_term</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># 检查生成的pe和计算的expected_pe是否接近</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">pe</span><span class="o">.</span><span class="n">pe</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">expected_pe</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="nf">test_forward_adds_positional_encoding</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">d_model</span> <span class="o">=</span> <span class="mi">512</span>
+</span></span><span class="line"><span class="cl">        <span class="n">seq_len</span> <span class="o">=</span> <span class="mi">20</span>
+</span></span><span class="line"><span class="cl">        <span class="n">batch_size</span> <span class="o">=</span> <span class="mi">2</span>
+</span></span><span class="line"><span class="cl">        <span class="n">pe</span> <span class="o">=</span> <span class="n">PositionalEncoding</span><span class="p">(</span><span class="n">d_model</span><span class="o">=</span><span class="n">d_model</span><span class="p">,</span> <span class="n">max_len</span><span class="o">=</span><span class="mi">1024</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># 关闭 dropout, dropout 具有随机性</span>
+</span></span><span class="line"><span class="cl">        <span class="n">pe</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># 创建一个输入张量</span>
+</span></span><span class="line"><span class="cl">        <span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">seq_len</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">d_model</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># 获取经过位置编码的输出</span>
+</span></span><span class="line"><span class="cl">        <span class="n">x_encoded</span> <span class="o">=</span> <span class="n">pe</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># 检查位置编码是否已添加到输入中</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">x_encoded</span><span class="p">,</span> <span class="n">x</span> <span class="o">+</span> <span class="n">pe</span><span class="o">.</span><span class="n">pe</span><span class="p">[:</span><span class="n">seq_len</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:],</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="nf">test_dropout_effect</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">d_model</span> <span class="o">=</span> <span class="mi">512</span>
+</span></span><span class="line"><span class="cl">        <span class="n">max_len</span> <span class="o">=</span> <span class="mi">1024</span>
+</span></span><span class="line"><span class="cl">        <span class="n">dropout</span> <span class="o">=</span> <span class="mf">0.5</span>
+</span></span><span class="line"><span class="cl">        <span class="n">pe</span> <span class="o">=</span> <span class="n">PositionalEncoding</span><span class="p">(</span><span class="n">d_model</span><span class="o">=</span><span class="n">d_model</span><span class="p">,</span> <span class="n">dropout</span><span class="o">=</span><span class="n">dropout</span><span class="p">,</span> <span class="n">max_len</span><span class="o">=</span><span class="n">max_len</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># 确保 dropout 应用在 forward 方法中</span>
+</span></span><span class="line"><span class="cl">        <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+</span></span><span class="line"><span class="cl">            <span class="n">pe</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>  <span class="c1"># 关闭 dropout</span>
+</span></span><span class="line"><span class="cl">            <span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">20</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">d_model</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">            <span class="n">x_encoded_no_dropout</span> <span class="o">=</span> <span class="n">pe</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">            <span class="n">pe</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>  <span class="c1"># 启用 dropout</span>
+</span></span><span class="line"><span class="cl">            <span class="n">x_encoded_with_dropout</span> <span class="o">=</span> <span class="n">pe</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># 确保在 dropout 启用的情况下，编码后有变化</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">assertFalse</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">equal</span><span class="p">(</span><span class="n">x_encoded_no_dropout</span><span class="p">,</span> <span class="n">x_encoded_with_dropout</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">    <span class="n">unittest</span><span class="o">.</span><span class="n">main</span><span class="p">()</span>
+</span></span></code></pre></div><h1 id="feed-forward-neural-network"><strong>Feed Forward Neural Network</strong></h1>
+<p><img src="https://img.miloz.icu/imgs/202411161439787.png" alt="image.png"></p>
+<p>在Transformer中, Encoder或者Decoder每个Block都需要用一个前馈神经网络来添加<strong>非线性</strong>:</p>
+<p>$$
+FFN(x) = ReLU(xW_1+b_1)W_2+b_2
+$$</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">FeedForwardNetwork</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">    <span class="s2">&#34;&#34;&#34;
+</span></span></span><span class="line"><span class="cl"><span class="s2">    Using nn.Cov1d replace nn.Linear to implements Fn
+</span></span></span><span class="line"><span class="cl"><span class="s2">    &#34;&#34;&#34;</span>
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">d_model</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">d_ff</span><span class="o">=</span><span class="mi">2048</span><span class="p">,</span> <span class="n">p_drop</span><span class="o">=</span><span class="mf">.1</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="nb">super</span><span class="p">(</span><span class="n">FeedForwardNetwork</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">        <span class="c1"># self.ff1 = nn.Linear(d_model, d_ff)</span>
+</span></span><span class="line"><span class="cl">        <span class="c1"># self.ff2 = nn.Linear(d_ff, d_model)</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">ff1</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv1d</span><span class="p">(</span><span class="n">in_channels</span><span class="o">=</span><span class="n">d_model</span><span class="p">,</span> <span class="n">out_channels</span><span class="o">=</span><span class="n">d_ff</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">ff2</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv1d</span><span class="p">(</span><span class="n">in_channels</span><span class="o">=</span><span class="n">d_ff</span><span class="p">,</span> <span class="n">out_channels</span><span class="o">=</span><span class="n">d_model</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">relu</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">dropout</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Dropout</span><span class="p">(</span><span class="n">p</span><span class="o">=</span><span class="n">p_drop</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">layer_norm</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">LayerNorm</span><span class="p">(</span><span class="n">d_model</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="c1"># x: [batch, seq_len, d_model]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">residual</span> <span class="o">=</span> <span class="n">x</span>
+</span></span><span class="line"><span class="cl">        <span class="n">x</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>   <span class="c1"># [batch, d_model, seq_len]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ff1</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ff2</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="n">x</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>   <span class="c1"># [batch, seq_len, d_model]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">layer_norm</span><span class="p">(</span><span class="n">residual</span> <span class="o">+</span> <span class="n">x</span><span class="p">)</span>
+</span></span></code></pre></div><h3 id="为什么需要transpose">为什么需要<code>transpose</code></h3>
+<p>在这个 <code>FeedForwardNetwork</code> 实现中，<code>x = x.transpose(1, 2)</code> 的主要目的是适应 <code>nn.Conv1d</code> 层的输入格式要求。
+<code>nn.Conv1d</code> 的输入维度要求是 <code>[batch, channels, seq_len]</code>，其中 <code>channels</code> 表示输入特征的维度，而 <code>seq_len</code> 表示序列长度。因此，输入 <code>x</code> 的形状 <code>[batch, seq_len, d_model]</code> 需要在第 1 和第 2 个维度之间进行转置，变为 <code>[batch, d_model, seq_len]</code>，才能让 <code>Conv1d</code> 层按照我们期望的方式处理特征维度 <code>d_model</code>。</p>
+<h3 id="使用-nnconv1d-替代-nnlinear-的原因">使用 <code>nn.Conv1d</code> 替代 <code>nn.Linear</code> 的原因</h3>
+<p>选择 <code>nn.Conv1d</code> 主要是因为 <code>Conv1d</code> 在处理数据时具有更高的并行计算效率，特别是在 GPU 上。使用 <code>kernel_size=1</code> 的 <code>Conv1d</code> 等价于 <code>Linear</code> 操作的作用，可以理解为在每个时间步上执行相同的全连接层操作。</p>
+<h3 id="用两个-conv1d-实现一个隐藏层的前馈网络">用两个 <code>Conv1d</code> 实现一个隐藏层的前馈网络</h3>
+<p>在一个前馈网络中，通常有一个线性变换（输入层到隐藏层）和一个非线性激活（比如 ReLU），然后再接一个线性变换（隐藏层到输出层）。因此，一个简单的前馈网络可以通过以下两步实现：</p>
+<ol>
+<li>用第一个 <code>Conv1d</code> 将输入特征维度 <code>d_model</code> 转换为隐藏层的维度 <code>d_ff</code>，并应用非线性激活。</li>
+<li>用第二个 <code>Conv1d</code> 将隐藏层的维度 <code>d_ff</code> 转换回输出特征维度 <code>d_model</code>。</li>
+</ol>
+<p>这个实现方式完全等价于使用 <code>Linear</code> 层的一个隐藏层网络，因为 <code>Conv1d</code> 这里充当的角色就是逐特征位置的线性变换，不涉及相邻位置的卷积操作。</p>
+<p>当 <code>Conv1d</code> 的卷积核大小为 <code>1</code> 时，它与 <code>Linear</code> 层等价，因此可以用两个 <code>Conv1d</code> 实现一个有单隐藏层的前馈神经网络</p>
+<h1 id="multi---head-attention"><strong>Multi - Head Attention</strong></h1>
+<p>多头注意力能够决定缩放点积注意力的输入大小. 作为一个子层, 其中的Residual Connection和Layer Norm是必须的.</p>
+<p>多头注意力是多个不同的头来获取不同的特征, 类似于多个<strong>卷积核</strong>所达到的效果. 在计算完后通过一个Linear调整大小:</p>
+<p>$$
+MultiHead(Q,K,V)=Concat(head_1, head_2, \dots,head_h)W^o \ where \quad head_i = Attention(QW_i^Q, kW_i^K, VW_i^V)
+$$</p>
+<p>多头注意力在Encoder和Decoder中的使用略有区别, 主要区别在于Mask的不同. 我们前面已经实现了两种Mask函数, 在这里会用到.</p>
+<p>多头注意力实际上不是通过弄出很多大小相同的矩阵然后相乘来实现的, 只需要合并到一个矩阵进行计算:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">MultiHeadAttention</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">d_model</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">n_heads</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">d_k</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span> <span class="n">d_v</span><span class="o">=</span><span class="mi">64</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="nb">super</span><span class="p">(</span><span class="n">MultiHeadAttention</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">n_heads</span> <span class="o">=</span> <span class="n">n_heads</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">d_model</span> <span class="o">=</span> <span class="n">d_model</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">d_k</span> <span class="o">=</span> <span class="n">d_k</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">d_v</span> <span class="o">=</span> <span class="n">d_v</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">W_Q</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">d_model</span><span class="p">,</span> <span class="n">d_k</span> <span class="o">*</span> <span class="n">n_heads</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">W_K</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">d_model</span><span class="p">,</span> <span class="n">d_k</span> <span class="o">*</span> <span class="n">n_heads</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">W_V</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">d_model</span><span class="p">,</span> <span class="n">d_v</span> <span class="o">*</span> <span class="n">n_heads</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">fc</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">d_v</span> <span class="o">*</span> <span class="n">n_heads</span><span class="p">,</span> <span class="n">d_model</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">layer_norm</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">LayerNorm</span><span class="p">(</span><span class="n">d_model</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_Q</span><span class="p">,</span> <span class="n">input_K</span><span class="p">,</span> <span class="n">input_V</span><span class="p">,</span> <span class="n">attn_mask</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="s2">&#34;&#34;&#34;
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :param input_Q: [batch, len_q, d_model]
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :param input_k: [batch, len_k d_model]
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :param input_v: [batch, len_v, d_model]
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :param attn_mask: [batch, len_q, len_q]
+</span></span></span><span class="line"><span class="cl"><span class="s2">        &#34;&#34;&#34;</span>
+</span></span><span class="line"><span class="cl">        <span class="n">residual</span><span class="p">,</span> <span class="n">batch</span> <span class="o">=</span> <span class="n">input_Q</span><span class="p">,</span> <span class="n">input_Q</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="c1"># [batch, len_q, d_model] -&gt; matual W_Q -&gt; [batch, len_q, d_q * n_heads] -&gt; view -&gt; [batch, len_q, n_heads, d_k] -&gt; transpose -&gt; [batch, n_heads, len_q, d_k]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">Q</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_Q</span><span class="p">(</span><span class="n">input_Q</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_heads</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">d_k</span><span class="p">)</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>   <span class="c1"># [batch, n_heads, len_q, d_k]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">K</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_K</span><span class="p">(</span><span class="n">input_K</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_heads</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">d_k</span><span class="p">)</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>   <span class="c1"># [batch, n_heads, len_k, d_k]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">V</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_V</span><span class="p">(</span><span class="n">input_V</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_heads</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">d_v</span><span class="p">)</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>   <span class="c1"># [batch, n_heads, len_v, d_v]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">attn_mask</span> <span class="o">=</span> <span class="n">attn_mask</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_heads</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>    <span class="c1"># [batch, seq_len, seq_len] -&gt; [batch, n_heads, seq_len, seq_len]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># prob: [batch, n_heads, len_q, d_v], attn: [batch, n_heads, len_q, len_k]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">prob</span><span class="p">,</span> <span class="n">attn</span> <span class="o">=</span> <span class="n">ScaledDotProductAttention</span><span class="p">()(</span><span class="n">Q</span><span class="p">,</span> <span class="n">K</span><span class="p">,</span> <span class="n">V</span><span class="p">,</span> <span class="n">attn_mask</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">prob</span> <span class="o">=</span> <span class="n">prob</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>    <span class="c1"># [batch, len_q, n_heads, d_v]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">prob</span> <span class="o">=</span> <span class="n">prob</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_heads</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">d_v</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>   <span class="c1"># [batch, len_q, n_heads * d_v]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fc</span><span class="p">(</span><span class="n">prob</span><span class="p">)</span>  <span class="c1"># [batch, len_q, d_model]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">layer_norm</span><span class="p">(</span><span class="n">residual</span> <span class="o">+</span> <span class="n">output</span><span class="p">),</span> <span class="n">att</span>
+</span></span></code></pre></div><h2 id="如何通过一个矩阵实现多头注意力计算">如何通过一个矩阵实现多头注意力计算</h2>
+<p>在多头注意力机制中，通过将查询、键和值投影到多个头的子空间中，我们可以并行计算每个头的注意力。然而，具体实现中通常会通过一个矩阵操作来同时完成所有头的计算，而不是逐个计算每个头的注意力。以下是如何利用一个矩阵来实现多个头的注意力计算的详细解释。</p>
+<ol>
+<li>
+<p><strong>线性变换的并行计算</strong></p>
+<ul>
+<li>多头注意力的每个头都需要独立的 <code>Q</code>、<code>K</code> 和 <code>V</code>，因此，为了效率，每个输入（<code>Q</code>、<code>K</code>、<code>V</code>）会通过一个大的线性变换来同时计算所有头的特征向量。</li>
+<li>例如，假设模型的输入维度为 <code>d_model</code>，而多头注意力包含 <code>n_heads</code> 个头，每个头的 <code>d_k</code> 和 <code>d_v</code> 为特征维度。为了计算多头的 <code>Q</code>，我们定义了一个形状为 <code>[d_model, d_k * n_heads]</code> 的矩阵 <code>W_Q</code>：
+<ul>
+<li><code>self.W_Q = nn.Linear(d_model, d_k * n_heads, bias=False)</code></li>
+</ul>
+</li>
+<li><code>input_Q</code> 的形状为 <code>[batch, len_q, d_model]</code>，经过 <code>W_Q</code> 变换后得到 <code>[batch, len_q, d_k * n_heads]</code>。这样，多个头的查询向量可以一次性计算完毕，而不需要单独计算每个头。</li>
+</ul>
+</li>
+<li>
+<p><strong>拆分和调整形状</strong></p>
+<ul>
+<li>
+<p>接下来，将 <code>Q</code> 的输出形状 <code>[batch, len_q, d_k * n_heads]</code> 重新调整为 <code>[batch, len_q, n_heads, d_k]</code>，以便区分不同的头。这一步通常通过 <code>view</code> 和 <code>transpose</code> 实现：</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="n">python</span>
+</span></span><span class="line"><span class="cl"><span class="n">复制代码</span>
+</span></span><span class="line"><span class="cl"><span class="n">Q</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_Q</span><span class="p">(</span><span class="n">input_Q</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_heads</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">d_k</span><span class="p">)</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>  <span class="c1"># [batch, n_heads, len_q, d_k]</span>
+</span></span></code></pre></div></li>
+<li>
+<p><code>transpose(1, 2)</code> 是为了让 <code>n_heads</code> 维度在第 2 维，以便在后续计算中并行处理每个头。</p>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>并行计算注意力得分</strong></p>
+<ul>
+<li>
+<p>通过上述步骤得到 <code>Q</code>, <code>K</code>, <code>V</code> 后，接下来计算缩放点积注意力。对于每个头的 <code>Q</code>、<code>K</code> 和 <code>V</code> 都有形状 <code>[batch, n_heads, len_q, d_k]</code> 和 <code>[batch, n_heads, len_k, d_k]</code>。</p>
+</li>
+<li>
+<p>缩放点积注意力公式为：</p>
+<p>$$
+Attention = softmax(\frac{QK^T}{\sqrt{d_k}})V
+$$</p>
+</li>
+<li>
+<p>由于 <code>Q</code> 和 <code>K</code> 以及 <code>V</code> 都已经包含了所有头的信息，通过一次矩阵乘法 <code>Q @ K^T</code> 可以并行计算每个头的注意力权重。具体操作如下：</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">attn_weights</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">K</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">))</span> <span class="o">/</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">d_k</span><span class="p">)</span>
+</span></span></code></pre></div></li>
+<li>
+<p><code>attn_weights</code> 的形状为 <code>[batch, n_heads, len_q, len_k]</code>，每一个头的注意力分数都被包含在其中。</p>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>应用注意力权重</strong></p>
+<ul>
+<li>
+<p>接下来对每个头的 <code>V</code> 应用注意力权重：</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">attn_output</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">attn_weights</span><span class="p">,</span> <span class="n">V</span><span class="p">)</span>  <span class="c1"># [batch, n_heads, len_q, d_v]</span>
+</span></span></code></pre></div></li>
+</ul>
+</li>
+<li>
+<p><strong>重组多头输出</strong></p>
+<ul>
+<li>最后，将所有头的输出拼接回一个整体。通过 <code>transpose</code> 和 <code>view</code>，将 <code>attn_output</code> 的形状 <code>[batch, n_heads, len_q, d_v]</code> 转换为 <code>[batch, len_q, n_heads * d_v]</code>，再用全连接层 <code>self.fc</code> 将多头的拼接输出映射回 <code>d_model</code> 维度。</li>
+</ul>
+</li>
+</ol>
+<p>通过这种方式，整个多头注意力计算可以高效并行地处理多个头，而不需要逐头地分别计算。</p>
+<h1 id="scaled-dotproduct-attention"><strong>Scaled DotProduct Attention</strong></h1>
+<p>Tranformer中非常重要的概念, 缩放点积注意力, 公式如下:</p>
+<p>$$
+Attention = softmax(\frac{QK^T}{\sqrt{d_k}})V
+$$</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">ScaledDotProductAttention</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">d_k</span><span class="o">=</span><span class="mi">64</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="nb">super</span><span class="p">(</span><span class="n">ScaledDotProductAttention</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">				<span class="bp">self</span><span class="o">.</span><span class="n">d_k</span> <span class="o">=</span> <span class="n">d_k</span>
+</span></span><span class="line"><span class="cl">				
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">K</span><span class="p">,</span> <span class="n">V</span><span class="p">,</span> <span class="n">attn_mask</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="s2">&#34;&#34;&#34;
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :param Q: [batch, n_heads, len_q, d_k]
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :param K: [batch, n_heads, len_k, d_k]
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :param V: [batch, n_heads, len_v, d_v]
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :param attn_mask: [batch, n_heads, seq_len, seq_len]
+</span></span></span><span class="line"><span class="cl"><span class="s2">        &#34;&#34;&#34;</span>
+</span></span><span class="line"><span class="cl">        <span class="n">scores</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">K</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">))</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">d_k</span><span class="p">)</span>   <span class="c1"># [batch, n_heads, len_q, len_k]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">scores</span><span class="o">.</span><span class="n">masked_fill_</span><span class="p">(</span><span class="n">attn_mask</span><span class="p">,</span> <span class="o">-</span><span class="mf">1e9</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">attn</span>  <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Softmax</span><span class="p">(</span><span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)(</span><span class="n">scores</span><span class="p">)</span>  <span class="c1"># [batch, n_heads, len_q, len_k]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">prob</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">attn</span><span class="p">,</span> <span class="n">V</span><span class="p">)</span>    <span class="c1"># [batch, n_heads, len_q, d_v]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="n">prob</span><span class="p">,</span> <span class="n">attn</span>
+</span></span></code></pre></div><ul>
+<li>缩放因子 <code>np.sqrt(self.d_k)</code> 是 Transformer 注意力机制中的重要一步，它通过对维度开平方来稳定梯度。</li>
+<li>使用掩码填充 <code>1e9</code> 是为了确保在 <code>Softmax</code> 后不关注某些位置。需要注意 <code>attn_mask</code> 的形状和 <code>scores</code> 匹配，否则会导致广播错误。</li>
+</ul>
+<h1 id="encoder-and-decoder"><strong>Encoder and Decoder</strong></h1>
+<p>根据Transformer的结构图，Encoder和Decoder有多个相同层堆叠而成，每层包含多头注意力和FFN以及对应的残差连接和LayerNorm。</p>
+<p><img src="https://img.miloz.icu/imgs/202411161439546.png" alt="image.png"></p>
+<h2 id="encoder"><strong>Encoder</strong></h2>
+<p>先定义Encoder Layer，输入为<code>encoder_input</code>和<code>encoder_pad_mask</code> ，返回<code>encode_output</code>维度与<code>encoder_input</code>相同，作为下一层的输入。</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">EncoderLayer</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="nb">super</span><span class="p">(</span><span class="n">EncoderLayer</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">encoder_self_attn</span> <span class="o">=</span> <span class="n">MultiHeadAttention</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">ffn</span> <span class="o">=</span> <span class="n">FeedForwardNetwork</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">encoder_input</span><span class="p">,</span> <span class="n">encoder_pad_mask</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="s2">&#34;&#34;&#34;
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :param encoder_input: [batch, source_len, d_model]
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :param encoder_pad_mask: [batch, source_len, source_len]
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :return: encoder_output: [batch, source_len, d_model], attn: [batch, n_heads, source_len, source_len]
+</span></span></span><span class="line"><span class="cl"><span class="s2">        &#34;&#34;&#34;</span>
+</span></span><span class="line"><span class="cl">        <span class="n">encoder_output</span><span class="p">,</span> <span class="n">attn</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoder_self_attn</span><span class="p">(</span><span class="n">encoder_input</span><span class="p">,</span> <span class="n">encoder_input</span><span class="p">,</span> <span class="n">encoder_input</span><span class="p">,</span> <span class="n">encoder_pad_mask</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="n">encoder_output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ffn</span><span class="p">(</span><span class="n">encoder_output</span><span class="p">)</span>   <span class="c1"># [batch, source_len, d_model]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="n">encoder_output</span><span class="p">,</span> <span class="n">attn</span>
+</span></span></code></pre></div><p>然后定义了一个完整的 <strong>Transformer 编码器模块（<code>Encoder</code>）</strong>。这是一个堆叠多个 <code>EncoderLayer</code> 的容器模块，主要用于从输入序列中提取深层次的特征表示。</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">Encoder</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">d_model</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">n_layers</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">source_vocab_size</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="nb">super</span><span class="p">(</span><span class="n">Encoder</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">source_embedding</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Embedding</span><span class="p">(</span><span class="n">source_vocab_size</span><span class="p">,</span> <span class="n">d_model</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">position_embedding</span> <span class="o">=</span> <span class="n">PositionalEncoding</span><span class="p">(</span><span class="n">d_model</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">layers</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleList</span><span class="p">([</span><span class="n">EncoderLayer</span><span class="p">()</span> <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_layers</span><span class="p">)])</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">encoder_input</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="c1"># encoder_input: [batch, source_len]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">encoder_output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_embedding</span><span class="p">(</span><span class="n">encoder_input</span><span class="p">)</span>   <span class="c1"># [batch, source_len, d_model]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">encoder_output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">position_embedding</span><span class="p">(</span><span class="n">encoder_output</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>    <span class="c1"># [batch, source_len, d_model]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">encoder_self_attn_mask</span> <span class="o">=</span> <span class="n">get_attn_pad_mask</span><span class="p">(</span><span class="n">encoder_input</span><span class="p">,</span> <span class="n">encoder_input</span><span class="p">)</span>    <span class="c1"># [batch, source_len, source_len]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">encoder_self_attns</span> <span class="o">=</span> <span class="p">[]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">layers</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">            <span class="c1"># encoder_output: [batch, source_len, d_model]</span>
+</span></span><span class="line"><span class="cl">            <span class="c1"># encoder_self_attn: [batch, n_heads, source_len, source_len]</span>
+</span></span><span class="line"><span class="cl">            <span class="n">encoder_output</span><span class="p">,</span> <span class="n">encoder_self_attn</span> <span class="o">=</span> <span class="n">layer</span><span class="p">(</span><span class="n">encoder_output</span><span class="p">,</span> <span class="n">encoder_self_attn_mask</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">            <span class="n">encoder_self_attns</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">encoder_self_attn</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="n">encoder_output</span><span class="p">,</span> <span class="n">encoder_self_attns</span>
+</span></span></code></pre></div><p><strong><code>encoder_output</code></strong>：编码器的最终输出，形状为 <code>[batch, source_len, d_model]</code>，表示输入序列的深层次表示，供解码器或其他模块使用。</p>
+<p><strong><code>encoder_self_attns</code></strong>：所有编码器层的自注意力权重，形状为 <code>[n_layers, batch, n_heads, source_len, source_len]</code>。可用于可视化或解释模型关注的模式。</p>
+<h2 id="decoder">Decoder</h2>
+<p>Decoder与Encoder差别不大，只是每层增加了Cross Attention。</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">DecoderLayer</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="nb">super</span><span class="p">(</span><span class="n">DecoderLayer</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">decoder_self_attn</span> <span class="o">=</span> <span class="n">MultiHeadAttention</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">encoder_decoder_attn</span> <span class="o">=</span> <span class="n">MultiHeadAttention</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">ffn</span> <span class="o">=</span> <span class="n">FeedForwardNetwork</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">decoder_input</span><span class="p">,</span> <span class="n">encoder_output</span><span class="p">,</span> <span class="n">decoder_self_mask</span><span class="p">,</span> <span class="n">decoder_encoder_mask</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="s2">&#34;&#34;&#34;
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :param decoder_input: [batch, target_len, d_model]
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :param encoder_output: [batch, source_len, d_model]
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :param decoder_self_mask: [batch, target_len, target_len]
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :param decoder_encoder_mask: [batch, target_len, target_len]
+</span></span></span><span class="line"><span class="cl"><span class="s2">        &#34;&#34;&#34;</span>
+</span></span><span class="line"><span class="cl">        <span class="c1"># masked mutlihead attention</span>
+</span></span><span class="line"><span class="cl">        <span class="c1"># Q, K, V all from decoder it self</span>
+</span></span><span class="line"><span class="cl">        <span class="c1"># decoder_output: [batch, target_len, d_model]</span>
+</span></span><span class="line"><span class="cl">        <span class="c1"># decoder_self_attn: [batch, n_heads, target_len, target_len]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">decoder_output</span><span class="p">,</span> <span class="n">decoder_self_attn</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">decoder_self_attn</span><span class="p">(</span><span class="n">decoder_input</span><span class="p">,</span> <span class="n">decoder_input</span><span class="p">,</span> <span class="n">decoder_input</span><span class="p">,</span> <span class="n">decoder_self_mask</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># Q from decoder, K, V from encoder</span>
+</span></span><span class="line"><span class="cl">        <span class="c1"># decoder_output: [batch, target_len, d_model]</span>
+</span></span><span class="line"><span class="cl">        <span class="c1"># decoder_encoder_attn: [batch, n_heads, target_len, source_len]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">decoder_output</span><span class="p">,</span> <span class="n">decoder_encoder_attn</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoder_decoder_attn</span><span class="p">(</span><span class="n">decoder_output</span><span class="p">,</span> <span class="n">encoder_output</span><span class="p">,</span> <span class="n">encoder_output</span><span class="p">,</span> <span class="n">decoder_encoder_mask</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="n">decoder_output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ffn</span><span class="p">(</span><span class="n">decoder_output</span><span class="p">)</span>   <span class="c1"># [batch, target_len, d_model]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="n">decoder_output</span><span class="p">,</span> <span class="n">decoder_self_attn</span><span class="p">,</span> <span class="n">decoder_encoder_attn</span>
+</span></span></code></pre></div><p>同时为了避免解码器看到未来的“答案”，需要额外的Mask。</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">Decoder</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">d_model</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">n_layers</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">target_vocab_size</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="nb">super</span><span class="p">(</span><span class="n">Decoder</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">target_embedding</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Embedding</span><span class="p">(</span><span class="n">target_vocab_size</span><span class="p">,</span> <span class="n">d_model</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">position_embedding</span> <span class="o">=</span> <span class="n">PositionalEncoding</span><span class="p">(</span><span class="n">d_model</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">layers</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleList</span><span class="p">([</span><span class="n">DecoderLayer</span><span class="p">()</span> <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_layers</span><span class="p">)])</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">decoder_input</span><span class="p">,</span> <span class="n">encoder_input</span><span class="p">,</span> <span class="n">encoder_output</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="s2">&#34;&#34;&#34;
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :param decoder_input: [batch, target_len]
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :param encoder_input: [batch, source_len]
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :param encoder_output: [batch, source_len, d_model]
+</span></span></span><span class="line"><span class="cl"><span class="s2">        &#34;&#34;&#34;</span>
+</span></span><span class="line"><span class="cl">        <span class="n">decoder_output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_embedding</span><span class="p">(</span><span class="n">decoder_input</span><span class="p">)</span>   <span class="c1"># [batch, target_len, d_model]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">decoder_output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">position_embedding</span><span class="p">(</span><span class="n">decoder_output</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>    <span class="c1"># [batch, target_len, d_model]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">decoder_self_attn_mask</span> <span class="o">=</span> <span class="n">get_attn_pad_mask</span><span class="p">(</span><span class="n">decoder_input</span><span class="p">,</span> <span class="n">decoder_input</span><span class="p">)</span>    <span class="c1"># [batch, target_len, target_len]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">decoder_subsequent_mask</span> <span class="o">=</span> <span class="n">get_attn_subsequent_mask</span><span class="p">(</span><span class="n">decoder_input</span><span class="p">)</span>   <span class="c1"># [batch, target_len, target_len]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">decoder_encoder_attn_mask</span> <span class="o">=</span> <span class="n">get_attn_pad_mask</span><span class="p">(</span><span class="n">decoder_input</span><span class="p">,</span> <span class="n">encoder_input</span><span class="p">)</span>    <span class="c1"># [batch, target_len, source_len]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">decoder_self_attn_mask</span> <span class="o">=</span> <span class="n">decoder_self_attn_mask</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="n">decoder_subsequent_mask</span> <span class="o">=</span> <span class="n">decoder_subsequent_mask</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">decoder_self_mask</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">gt</span><span class="p">(</span><span class="n">decoder_self_attn_mask</span> <span class="o">+</span> <span class="n">decoder_subsequent_mask</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="n">decoder_self_attns</span> <span class="o">=</span> <span class="p">[]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">decoder_encoder_attn_attns</span> <span class="o">=</span> <span class="p">[]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">layers</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">            <span class="c1"># decoder_output: [batch, target_len, d_model]</span>
+</span></span><span class="line"><span class="cl">            <span class="c1"># decoder_self_attn: [batch, n_heads, target_len, target_len]</span>
+</span></span><span class="line"><span class="cl">            <span class="c1"># decoder_encoder_attn: [batch, n_heads, target_len, source_len]</span>
+</span></span><span class="line"><span class="cl">            <span class="n">decoder_output</span><span class="p">,</span> <span class="n">decoder_self_attn</span><span class="p">,</span> <span class="n">decoder_encoder_attn</span> <span class="o">=</span> <span class="n">layer</span><span class="p">(</span><span class="n">decoder_output</span><span class="p">,</span> <span class="n">encoder_output</span><span class="p">,</span> <span class="n">decoder_self_mask</span><span class="p">,</span> <span class="n">decoder_encoder_attn_mask</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">            <span class="n">decoder_self_attns</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">decoder_self_attn</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">            <span class="n">decoder_encoder_attn_attns</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">decoder_encoder_attn</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="n">decoder_output</span><span class="p">,</span> <span class="n">decoder_self_attns</span><span class="p">,</span> <span class="n">decoder_encoder_attn_attns</span>
+</span></span></code></pre></div><h3 id="corss-attention">Corss Attention</h3>
+<p>在标准 Transformer 的解码器中，注意力机制包括：</p>
+<ol>
+<li><strong>Decoder Self-Attention（解码器自注意力）</strong>
+<ul>
+<li>Q,K,VQ, K, VQ,K,V 都来自解码器当前生成的目标序列。</li>
+<li>用于捕捉目标序列中自身的上下文信息。</li>
+<li>通常会应用掩码（Mask），确保解码器不能看到未来时间步的目标词。</li>
+</ul>
+</li>
+<li><strong>Cross Attention（跨注意力）</strong>
+<ul>
+<li>
+<p>QQQ 来自解码器，K,V 来自编码器。</p>
+<p>K,VK, V</p>
+</li>
+<li>
+<p>用于将输入序列的特征动态地融合到目标序列中。</p>
+</li>
+</ul>
+</li>
+<li><strong>Encoder Self-Attention（编码器自注意力）</strong>
+<ul>
+<li>Q,K,VQ, K, VQ,K,V 都来自编码器的输入序列。</li>
+<li>用于捕捉输入序列中的全局特征。</li>
+</ul>
+</li>
+</ol>
+<h3 id="为什么cross-attention的q来自解码器kv来自编码器"><strong>为什么Cross Attention的Q来自解码器，KV来自编码器？</strong></h3>
+<p>因为跨注意力的任务是将编码器的输出与解码器的当前状态结合，生成与目标序列相关的上下文表示。</p>
+<p>在 Transformer 的设计中，<code>encoder_decoder_attn</code>（即解码器中的跨注意力机制）之所以 <strong>Q 来自解码器，而 K 和 V 来自编码器</strong>，是因为跨注意力的任务是将编码器的输出与解码器的当前状态结合，生成与目标序列相关的上下文表示。以下是具体原因和背后的逻辑：</p>
+<ol>
+<li><strong>解码器的工作原理</strong></li>
+</ol>
+<p>解码器的主要任务是基于目标序列的部分输入（如已经生成的词）和编码器的输出，逐步生成目标序列。因此：</p>
+<ul>
+<li>解码器需要在生成当前词时，关注输入序列中与当前上下文相关的信息。</li>
+<li>解码器的跨注意力机制就是实现这一点的关键模块。</li>
+</ul>
+<ol>
+<li><strong>跨注意力机制中的 Q、K 和 V</strong></li>
+</ol>
+<ul>
+<li>
+<p><strong>Q (Query)</strong>: 表示解码器当前生成位置的特征，即解码器的隐藏状态。它代表了当前解码器“想要问什么”。</p>
+</li>
+<li>
+<p><strong>K (Key)</strong>: 表示编码器对输入序列的特征表示，代表了输入中“能被查询到的内容”。</p>
+</li>
+<li>
+<p><strong>V (Value)</strong>: 与 K 对应，是输入序列特征的实际值信息，代表“被查询到的具体内容”。</p>
+<p>在跨注意力中，解码器用其隐藏状态（Q）去查询编码器的特征（K 和 V），从而获取输入序列中与当前解码上下文最相关的信息。</p>
+</li>
+</ul>
+<ol>
+<li>
+<p><strong>为什么 Q 来自解码器，K 和 V 来自编码器？</strong></p>
+<p>这设计是基于解码器和编码器各自的角色：</p>
+<ul>
+<li><strong>编码器的角色</strong>：对输入序列进行编码，提取输入的语义特征，生成一组固定表示（K 和 V）。这些特征表示输入序列的全部信息。</li>
+<li><strong>解码器的角色</strong>：根据当前生成的目标序列片段和输入序列的特征，生成新的目标词。因此，它需要用自己的隐藏状态（Q）去关注编码器的输出（K 和 V）。</li>
+</ul>
+<p>通过这种设计：</p>
+<ul>
+<li>解码器的每个时间步可以根据编码器生成的全局特征，关注到输入序列中最相关的部分。</li>
+<li>输入序列和目标序列可以动态交互，从而实现更好的翻译或生成效果。</li>
+</ul>
+</li>
+</ol>
+<h1 id="transformer"><strong>Transformer</strong></h1>
+<p>标准 Transformer 模型的三个核心部分：编码器（<code>Encoder</code>）、解码器（<code>Decoder</code>）以及投影层（<code>Projection</code>），并将其完整地串联在一起实现前向传播。</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">Transformer</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">d_model</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">source_vocab_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span> <span class="n">target_vocab_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="nb">super</span><span class="p">(</span><span class="n">Transformer</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">encoder</span> <span class="o">=</span> <span class="n">Encoder</span><span class="p">(</span><span class="n">source_vocab_size</span><span class="o">=</span><span class="n">source_vocab_size</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">decoder</span> <span class="o">=</span> <span class="n">Decoder</span><span class="p">(</span><span class="n">target_vocab_size</span><span class="o">=</span><span class="n">target_vocab_size</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">projection</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">d_model</span><span class="p">,</span> <span class="n">target_vocab_size</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">encoder_input</span><span class="p">,</span> <span class="n">decoder_input</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="s2">&#34;&#34;&#34;
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :param encoder_input: [batch, source_len]
+</span></span></span><span class="line"><span class="cl"><span class="s2">        :param decoder_input: [batch, target_len]
+</span></span></span><span class="line"><span class="cl"><span class="s2">        &#34;&#34;&#34;</span>
+</span></span><span class="line"><span class="cl">        <span class="c1"># encoder_output: [batch, source_len, d_model], encoder_self_attns: [n_layers, batch, n_heads, source_len, source_len]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">encoder_output</span><span class="p">,</span> <span class="n">encoder_self_attns</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoder</span><span class="p">(</span><span class="n">encoder_input</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="c1"># decoder_output: [batch, target_len, d_model]</span>
+</span></span><span class="line"><span class="cl">        <span class="c1"># decoder_self_attns: [n_layers, batch, n_heads, target_len, target_len]</span>
+</span></span><span class="line"><span class="cl">        <span class="n">decoder_output</span><span class="p">,</span> <span class="n">decoder_self_attns</span><span class="p">,</span> <span class="n">decoder_encoder_attns</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">decoder</span><span class="p">(</span><span class="n">decoder_input</span><span class="p">,</span> <span class="n">encoder_input</span><span class="p">,</span> <span class="n">encoder_output</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">decoder_logits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">projection</span><span class="p">(</span><span class="n">decoder_output</span><span class="p">)</span>    <span class="c1"># [batch, target_len, target_vocab_size]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="n">decoder_logits</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">decoder_logits</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)),</span> <span class="n">encoder_self_attns</span><span class="p">,</span> <span class="n">decoder_self_attns</span><span class="p">,</span> <span class="n">decoder_encoder_attns</span>
+</span></span></code></pre></div><h1 id="training">Training</h1>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">Seq2SeqDataset</span><span class="p">(</span><span class="n">Data</span><span class="o">.</span><span class="n">Dataset</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">enocder_input</span><span class="p">,</span> <span class="n">decoder_input</span><span class="p">,</span> <span class="n">decoder_output</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="nb">super</span><span class="p">(</span><span class="n">Seq2SeqDataset</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">enocder_input</span> <span class="o">=</span> <span class="n">enocder_input</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">decoder_input</span> <span class="o">=</span> <span class="n">decoder_input</span>
+</span></span><span class="line"><span class="cl">        <span class="bp">self</span><span class="o">.</span><span class="n">decoder_output</span> <span class="o">=</span> <span class="n">decoder_output</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">enocder_input</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">enocder_input</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">decoder_input</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">decoder_output</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">        
+</span></span><span class="line"><span class="cl"><span class="n">sentences</span> <span class="o">=</span> <span class="p">[</span>
+</span></span><span class="line"><span class="cl">    <span class="c1"># enc_input           dec_input         dec_output</span>
+</span></span><span class="line"><span class="cl">    <span class="p">[</span><span class="s1">&#39;ich mochte ein bier P&#39;</span><span class="p">,</span> <span class="s1">&#39;S i want a beer .&#39;</span><span class="p">,</span> <span class="s1">&#39;i want a beer . E&#39;</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">    <span class="p">[</span><span class="s1">&#39;ich mochte ein cola P&#39;</span><span class="p">,</span> <span class="s1">&#39;S i want a coke .&#39;</span><span class="p">,</span> <span class="s1">&#39;i want a coke . E&#39;</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl"><span class="p">]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># Padding Should be Zero</span>
+</span></span><span class="line"><span class="cl"><span class="n">source_vocab</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;P&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;ich&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;mochte&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;ein&#39;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span> <span class="s1">&#39;bier&#39;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span> <span class="s1">&#39;cola&#39;</span><span class="p">:</span> <span class="mi">5</span><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="n">source_vocab_size</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">source_vocab</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">target_vocab</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;P&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;i&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;want&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;a&#39;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span> <span class="s1">&#39;beer&#39;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span> <span class="s1">&#39;coke&#39;</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span> <span class="s1">&#39;S&#39;</span><span class="p">:</span> <span class="mi">6</span><span class="p">,</span> <span class="s1">&#39;E&#39;</span><span class="p">:</span> <span class="mi">7</span><span class="p">,</span> <span class="s1">&#39;.&#39;</span><span class="p">:</span> <span class="mi">8</span><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="n">idx2word</span> <span class="o">=</span> <span class="p">{</span><span class="n">i</span><span class="p">:</span> <span class="n">w</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">w</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">target_vocab</span><span class="p">)}</span>
+</span></span><span class="line"><span class="cl"><span class="n">target_vocab_size</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">target_vocab</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">source_len</span> <span class="o">=</span> <span class="mi">5</span>  <span class="c1"># max length of input sequence</span>
+</span></span><span class="line"><span class="cl"><span class="n">target_len</span> <span class="o">=</span> <span class="mi">6</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">batch_size</span> <span class="o">=</span> <span class="mi">8</span>
+</span></span><span class="line"><span class="cl"><span class="n">epochs</span> <span class="o">=</span> <span class="mi">64</span>
+</span></span><span class="line"><span class="cl"><span class="n">lr</span> <span class="o">=</span> <span class="mf">1e-4</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&#34;cuda&#34;</span> <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span> <span class="k">else</span> <span class="s2">&#34;cpu&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">model</span> <span class="o">=</span> <span class="n">Transformer</span><span class="p">(</span><span class="n">source_vocab_size</span><span class="o">=</span><span class="n">source_vocab_size</span><span class="p">,</span> <span class="n">target_vocab_size</span><span class="o">=</span><span class="n">target_vocab_size</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="n">criterion</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">CrossEntropyLoss</span><span class="p">(</span><span class="n">ignore_index</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="n">optimizer</span> <span class="o">=</span> <span class="n">optim</span><span class="o">.</span><span class="n">Adam</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span><span class="o">=</span><span class="n">lr</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">encoder_inputs</span><span class="p">,</span> <span class="n">decoder_inputs</span><span class="p">,</span> <span class="n">decoder_outputs</span> <span class="o">=</span> <span class="n">make_data</span><span class="p">(</span><span class="n">sentences</span><span class="p">,</span> <span class="n">source_vocab</span><span class="p">,</span> <span class="n">target_vocab</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="n">dataset</span> <span class="o">=</span> <span class="n">Seq2SeqDataset</span><span class="p">(</span><span class="n">encoder_inputs</span><span class="p">,</span> <span class="n">decoder_inputs</span><span class="p">,</span> <span class="n">decoder_outputs</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="n">dataloader</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span><span class="n">dataset</span><span class="o">=</span><span class="n">dataset</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">epochs</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">    <span class="s1">&#39;&#39;&#39;
+</span></span></span><span class="line"><span class="cl"><span class="s1">    encoder_input: [batch, source_len]
+</span></span></span><span class="line"><span class="cl"><span class="s1">    decoder_input: [batch, target_len]
+</span></span></span><span class="line"><span class="cl"><span class="s1">    decoder_ouput: [batch, target_len]
+</span></span></span><span class="line"><span class="cl"><span class="s1">    &#39;&#39;&#39;</span>
+</span></span><span class="line"><span class="cl">    <span class="k">for</span> <span class="n">encoder_input</span><span class="p">,</span> <span class="n">decoder_input</span><span class="p">,</span> <span class="n">decoder_output</span> <span class="ow">in</span> <span class="n">dataloader</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">        <span class="n">encoder_input</span> <span class="o">=</span> <span class="n">encoder_input</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="n">decoder_input</span> <span class="o">=</span> <span class="n">decoder_input</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="n">decoder_output</span> <span class="o">=</span> <span class="n">decoder_output</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">output</span><span class="p">,</span> <span class="n">encoder_attns</span><span class="p">,</span> <span class="n">decoder_attns</span><span class="p">,</span> <span class="n">decoder_encoder_attns</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">encoder_input</span><span class="p">,</span> <span class="n">decoder_input</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="n">loss</span> <span class="o">=</span> <span class="n">criterion</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">decoder_output</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Epoch:&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">%04d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">epoch</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="s1">&#39;loss =&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{:.6f}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">loss</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">        <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">        <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>    
+</span></span></code></pre></div>
+    </div>
+  </div>
+
+    <div class="footer">
+  
+  <div class="footer-social">
+    
+      <span class="social-icon social-icon-twitter">
+        <a href="https://twitter.com/default1021" title="twitter" target="_blank" rel="noopener">
+          <img src="/images/social/twitter.svg" width="24" height="24" alt="twitter"/>
+        </a>
+      </span>
+    
+      <span class="social-icon social-icon-github">
+        <a href="https://github.com/nanjingblue" title="github" target="_blank" rel="noopener">
+          <img src="/images/social/github.svg" width="24" height="24" alt="github"/>
+        </a>
+      </span>
+    
+      <span class="social-icon social-icon-linkedin">
+        <a href="https://www.linkedin.com" title="linkedin" target="_blank" rel="noopener">
+          <img src="/images/social/linkedin.svg" width="24" height="24" alt="linkedin"/>
+        </a>
+      </span>
+    
+  </div>
+  
+</div>
+  </div>
+
+  
+
+  
+    <script type="text/javascript" src="/js/bundle.min.f4b89ae6d3bcfbc54c7338e4946561ea43d9e1576332a05dc4c95fdf16244fe8.js"></script>
+  
+
+  
+  
+
+  
+  
+  
+    
+  
+
+  
+
+  
+
+</body>
+
+</html>

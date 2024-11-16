@@ -8,6 +8,17 @@
     <language>en-us</language>
     <lastBuildDate>Thu, 14 Nov 2024 00:00:00 +0000</lastBuildDate><atom:link href="https://nanjingblue.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
     <item>
+      <title>Torch实现Transformer</title>
+      <link>https://nanjingblue.github.io/posts/2024-11-16-transformer/</link>
+      <pubDate>Sat, 16 Nov 2024 00:00:00 +0000</pubDate>
+      
+      <guid>https://nanjingblue.github.io/posts/2024-11-16-transformer/</guid>
+      <description>Transformer torch实现 Preparing 导包
+import torch from torch import nn from torch import optim from torch.utils import data as Data import numpy as np 超参数设置
+d_model = 512 # embedding size max_len = 1024 # max length of sequence d_ff = 2048 # feed forward neural network dimension d_k = d_v = 64 # dimension of k (same as q) and v n_layers = 6 # number of encoder ans decoder layers n_heads = 8 # number of heads in multi head attention p_drop = 0.</description>
+    </item>
+    
+    <item>
       <title>Hello world</title>
       <link>https://nanjingblue.github.io/posts/helloworld/</link>
       <pubDate>Fri, 15 Nov 2024 00:00:00 +0000</pubDate>
